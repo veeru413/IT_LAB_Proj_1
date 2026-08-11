@@ -1,0 +1,80 @@
+// ---------------------------------------------------------------------------
+// Prisma schema - Student Task/Assignment Manager
+//
+// Database: SQLite (local file, no cloud dependency).
+//
+// NOTE ON ENUMS: Prisma does not support native `enum` blocks on the SQLite
+// connector. `role`, `priority` and `status` are therefore stored as TEXT and
+// constrained by:
+//   1. Zod schemas at the API boundary  (src/schemas/*.ts)
+//   2. TypeScript union types           (src/types/domain.ts)
+//   3. Sensible column defaults          (below)
+// See DATABASE.md for the full explanation.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// An application user. `role` is either "STUDENT" or "ADMIN".
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  /// College roll number. Required for students, null for admin accounts.
+  /// SQLite allows multiple NULLs in a UNIQUE column, so this stays unique
+  /// for every real student ID.
+  studentId    String?  @unique
+  email        String   @unique
+  /// bcrypt hash - a plaintext password is never persisted.
+  passwordHash String
+  /// "STUDENT" | "ADMIN"
+  role         String   @default("STUDENT")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  /// Tasks this user owns (1 user -> many tasks).
+  tasks        Task[]   @relation("TaskOwner")
+  /// Tasks this user authored (a student's own tasks, or admin-assigned ones).
+  createdTasks Task[]   @relation("TaskCreator")
+
+  @@index([email])
+  @@index([studentId])
+  @@index([role])
+  @@map("users")
+}
+
+/// A single assignment / task belonging to exactly one student.
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  subject     String
+  /// "LOW" | "MEDIUM" | "HIGH"
+  priority    String   @default("MEDIUM")
+  /// "PENDING" | "COMPLETED". "OVERDUE" is derived, never stored.
+  status      String   @default("PENDING")
+  dueDate     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Owner of the task. Deleting the user removes their tasks.
+  studentId String
+  student   User   @relation("TaskOwner", fields: [studentId], references: [id], onDelete: Cascade)
+
+  /// Who created the task - the student themselves, or an admin/professor.
+  createdBy String
+  creator   User   @relation("TaskCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([subject])
+  @@index([createdBy])
+  @@index([studentId, status])
+  @@map("tasks")
+}

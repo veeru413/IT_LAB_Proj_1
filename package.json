@@ -1,0 +1,30 @@
+{
+  "name": "student-task-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Student Task/Assignment Manager - a full-stack MERN-style application built with React, Express, Prisma and SQLite.",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "setup": "npm run setup --workspace backend",
+    "dev": "concurrently -n \"API,WEB\" -c \"cyan,magenta\" \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "start": "npm run start --workspace backend",
+    "test": "npm run test --workspace backend",
+    "typecheck": "npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
+    "db:seed": "npm run db:seed --workspace backend",
+    "db:reset": "npm run db:reset --workspace backend",
+    "db:studio": "npm run prisma:studio --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "license": "MIT"
+}
