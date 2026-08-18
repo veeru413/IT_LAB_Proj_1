@@ -9,6 +9,7 @@ interface AuthContextValue {
   isInitialising: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isStaff: boolean;
   login: (email: string, password: string) => Promise<User>;
   register: (payload: authService.RegisterPayload) => Promise<User>;
   logout: () => Promise<void>;
@@ -101,6 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isInitialising,
       isAuthenticated: Boolean(user),
       isAdmin: user?.role === 'ADMIN',
+      isStaff: user?.role === 'ADMIN' || user?.role === 'EXAMINER',
       login,
       register,
       logout,

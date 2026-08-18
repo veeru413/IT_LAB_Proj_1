@@ -1,252 +1,280 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertTriangle, CalendarCheck2, CheckCircle2, ClipboardList, Clock, Plus } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Clock3, Send, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { StatCard } from '@/components/ui/StatCard';
+import { Badge } from '@/components/ui/Badge';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Alert, EmptyState, SkeletonList } from '@/components/ui/Feedback';
-import { TaskCard } from '@/components/tasks/TaskCard';
-import { TaskFormModal } from '@/components/tasks/TaskFormModal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import type { TaskFormValues } from '@/components/tasks/taskFormSchema';
-import * as taskService from '@/services/task.service';
+import { Alert, EmptyState, Spinner } from '@/components/ui/Feedback';
+import { PageHeader } from '@/components/ui/PageHeader';
+import * as examService from '@/services/exam.service';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
-import type { Task, TaskSummary } from '@/types';
+import { formatDateTime } from '@/utils/date';
+import type { ExamQuestion, ExamSession, QuestionOption } from '@/types';
 
-/**
- * Student landing page: headline counters plus the deadlines that need
- * attention next.
- */
+const OPTION_ORDER: QuestionOption[] = ['A', 'B', 'C', 'D'];
+
+const formatTime = (seconds: number): string => {
+  const safe = Math.max(seconds, 0);
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+};
+
 export const DashboardPage = () => {
   const { user } = useAuth();
   const { notify } = useToast();
 
-  const [summary, setSummary] = useState<TaskSummary | null>(null);
-  const [upcoming, setUpcoming] = useState<Task[]>([]);
+  const [session, setSession] = useState<ExamSession | null>(null);
+  const [answers, setAnswers] = useState<Record<string, QuestionOption>>({});
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ score: number; totalQuestions: number; percentage: number } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
-  const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const startedAtRef = useRef<Date>(new Date());
+  const hasAutoSubmitted = useRef(false);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  useEffect(() => {
+    let cancelled = false;
 
-    try {
-      const data = await taskService.getDashboard();
-      setSummary(data.summary);
-      setUpcoming(data.upcoming);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Failed to load your dashboard');
-    } finally {
-      setIsLoading(false);
-    }
+    const load = async () => {
+      try {
+        const data = await examService.getSession();
+        if (cancelled) return;
+
+        setSession(data);
+        setRemainingSeconds(data.latestAttempt ? 0 : data.exam.durationSeconds);
+        startedAtRef.current = new Date();
+        setResult(
+          data.latestAttempt
+            ? {
+                score: data.latestAttempt.score,
+                totalQuestions: data.latestAttempt.totalQuestions,
+                percentage:
+                  data.latestAttempt.totalQuestions > 0
+                    ? Math.round((data.latestAttempt.score / data.latestAttempt.totalQuestions) * 100)
+                    : 0,
+              }
+            : null,
+        );
+        setAnswers(data.latestAttempt?.answers ?? {});
+      } catch (caught) {
+        if (!cancelled) {
+          setError(caught instanceof Error ? caught.message : 'Failed to load the exam');
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!session || result) return undefined;
 
-  const handleSubmit = async (values: TaskFormValues) => {
-    setFormError(null);
+    const timer = window.setInterval(() => {
+      setRemainingSeconds((current) => {
+        if (current <= 1) {
+          if (!hasAutoSubmitted.current) {
+            hasAutoSubmitted.current = true;
+            void handleSubmit();
+          }
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
 
-    try {
-      const payload = {
-        title: values.title,
-        description: values.description ?? '',
-        subject: values.subject,
-        dueDate: values.dueDate,
-        priority: values.priority,
-      };
+    return () => window.clearInterval(timer);
+  }, [session, result]);
 
-      if (editingTask) {
-        await taskService.updateTask(editingTask.id, { ...payload, status: values.status });
-        notify('Task updated successfully');
-      } else {
-        await taskService.createTask(payload);
-        notify('Task created successfully');
-      }
+  const totalQuestions = session?.exam.totalQuestions ?? 0;
+  const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
 
-      setIsFormOpen(false);
-      setEditingTask(null);
-      await load();
-    } catch (caught) {
-      setFormError(caught instanceof Error ? caught.message : 'Could not save the task');
-    }
+  const handleOptionChange = (questionId: string, option: QuestionOption) => {
+    if (result) return;
+    setAnswers((current) => ({ ...current, [questionId]: option }));
   };
 
-  const handleToggleStatus = async (task: Task) => {
-    setBusyTaskId(task.id);
+  const handleSubmit = async () => {
+    if (!session || result || isSubmitting || totalQuestions === 0) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
-      const next = task.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED';
-      await taskService.updateTaskStatus(task.id, next);
-      notify(next === 'COMPLETED' ? 'Task marked as completed' : 'Task moved back to pending');
-      await load();
-    } catch (caught) {
-      notify(caught instanceof Error ? caught.message : 'Could not update the task', 'error');
-    } finally {
-      setBusyTaskId(null);
-    }
-  };
+      const elapsedSeconds = Math.max(
+        0,
+        Math.floor((Date.now() - startedAtRef.current.getTime()) / 1000),
+      );
 
-  const handleDelete = async () => {
-    if (!taskToDelete) return;
-    setBusyTaskId(taskToDelete.id);
+      const response = await examService.submitExam({
+        answers,
+        startedAt: startedAtRef.current.toISOString(),
+        elapsedSeconds,
+      });
 
-    try {
-      await taskService.deleteTask(taskToDelete.id);
-      notify('Task deleted');
-      setTaskToDelete(null);
-      await load();
+      setResult({
+        score: response.score,
+        totalQuestions: response.totalQuestions,
+        percentage: response.percentage,
+      });
+      notify('Exam submitted successfully', 'success');
     } catch (caught) {
-      notify(caught instanceof Error ? caught.message : 'Could not delete the task', 'error');
+      setSubmitError(caught instanceof Error ? caught.message : 'Could not submit the exam');
     } finally {
-      setBusyTaskId(null);
+      setIsSubmitting(false);
     }
   };
 
   const firstName = user?.name.split(' ')[0] ?? 'there';
 
+  if (isLoading) return <Spinner />;
+
+  if (error || !session) {
+    return <Alert>{error ?? 'No exam data available'}</Alert>;
+  }
+
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Welcome, {firstName}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Here is where your coursework stands today.
-          </p>
-        </div>
-
-        <Button
-          size="lg"
-          onClick={() => {
-            setEditingTask(null);
-            setFormError(null);
-            setIsFormOpen(true);
-          }}
-          leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
-        >
-          Add new task
-        </Button>
-      </div>
-
-      {error && <Alert className="mb-6">{error}</Alert>}
-
-      {/* Counters */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total tasks"
-          value={summary?.total ?? 0}
-          icon={ClipboardList}
-          tone="brand"
-        />
-        <StatCard label="Pending" value={summary?.pending ?? 0} icon={Clock} tone="amber" />
-        <StatCard
-          label="Completed"
-          value={summary?.completed ?? 0}
-          icon={CheckCircle2}
-          tone="emerald"
-          hint={
-            summary && summary.total > 0
-              ? `${Math.round((summary.completed / summary.total) * 100)}% of all tasks`
-              : undefined
-          }
-        />
-        <StatCard
-          label="Overdue"
-          value={summary?.overdue ?? 0}
-          icon={AlertTriangle}
-          tone="rose"
-          hint={summary?.overdue ? 'Needs attention' : 'Nothing past due'}
-        />
-      </div>
-
-      {/* Upcoming deadlines */}
-      <Card>
-        <CardHeader>
-          <div>
-            <CardTitle>Upcoming assignments</CardTitle>
-            <p className="mt-0.5 text-sm text-slate-500">
-              Your five most urgent pending tasks, nearest deadline first.
-            </p>
+    <div className="space-y-6">
+      <PageHeader
+        title={`Hello, ${firstName}`}
+        description="Read each question carefully, choose one answer, and submit before the timer ends."
+        actions={
+          <div className="flex items-center gap-2">
+            {result ? (
+              <Badge tone="success" icon={<ShieldCheck className="h-3.5 w-3.5" />}>
+                Submitted
+              </Badge>
+            ) : (
+              <Badge tone={remainingSeconds <= 60 ? 'danger' : 'brand'} icon={<Clock3 className="h-3.5 w-3.5" />}>
+                {formatTime(remainingSeconds)}
+              </Badge>
+            )}
+            <Badge tone="neutral">{answeredCount}/{totalQuestions} answered</Badge>
           </div>
+        }
+      />
 
-          <Link
-            to="/tasks"
-            className="shrink-0 text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline"
-          >
-            View all tasks
-          </Link>
-        </CardHeader>
+      {submitError && <Alert>{submitError}</Alert>}
 
-        <CardBody>
-          {isLoading ? (
-            <SkeletonList rows={3} />
-          ) : upcoming.length === 0 ? (
-            <EmptyState
-              icon={<CalendarCheck2 className="h-6 w-6" aria-hidden="true" />}
-              title="Nothing pending"
-              message="You have no outstanding assignments. Add a new task to start tracking one."
-              action={
-                <Button
-                  onClick={() => {
-                    setEditingTask(null);
-                    setIsFormOpen(true);
-                  }}
-                  leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
-                >
-                  Add new task
-                </Button>
-              }
-            />
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
-              {upcoming.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  isBusy={busyTaskId === task.id}
-                  onEdit={(target) => {
-                    setEditingTask(target);
-                    setFormError(null);
-                    setIsFormOpen(true);
-                  }}
-                  onToggleStatus={handleToggleStatus}
-                  onDelete={setTaskToDelete}
-                />
-              ))}
+      {result && (
+        <Alert variant="info">
+          Your exam has already been submitted. Only one attempt is allowed, so the question paper is now locked.
+        </Alert>
+      )}
+
+      {!result && (
+        <Card>
+          <CardHeader>
+            <div>
+              <CardTitle>{session.exam.title}</CardTitle>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {session.exam.totalQuestions} questions, fixed timer, automatic scoring after submit.
+              </p>
             </div>
-          )}
-        </CardBody>
-      </Card>
+            <div className="text-right text-sm text-slate-500">
+              <p>Started at</p>
+              <p className="font-medium text-slate-800">{formatDateTime(startedAtRef.current.toISOString())}</p>
+            </div>
+          </CardHeader>
 
-      <TaskFormModal
-        isOpen={isFormOpen}
-        task={editingTask}
-        serverError={formError}
-        onClose={() => {
-          setIsFormOpen(false);
-          setEditingTask(null);
-        }}
-        onSubmit={handleSubmit}
-      />
+          <CardBody className="space-y-5">
+            {session.questions.length === 0 ? (
+              <EmptyState
+                title="No questions available"
+                message="Ask the examiner to publish the question bank first."
+              />
+            ) : (
+              session.questions.map((question: ExamQuestion) => (
+                <div key={question.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                        Question {question.position}
+                      </p>
+                      <h3 className="mt-1 text-base font-semibold text-slate-900">{question.questionText}</h3>
+                    </div>
+                    <Badge tone="info">{question.subject}</Badge>
+                  </div>
 
-      <ConfirmDialog
-        isOpen={Boolean(taskToDelete)}
-        title="Delete task"
-        message={`Are you sure you want to delete "${taskToDelete?.title}"? This action cannot be undone.`}
-        isLoading={busyTaskId === taskToDelete?.id}
-        onConfirm={handleDelete}
-        onCancel={() => setTaskToDelete(null)}
-      />
+                  <div className="mt-4 grid gap-2">
+                    {OPTION_ORDER.map((option) => (
+                      <label
+                        key={option}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 px-3 py-2.5 transition-colors hover:border-brand-300 hover:bg-brand-50"
+                      >
+                        <input
+                          type="radio"
+                          name={question.id}
+                          value={option}
+                          checked={answers[question.id] === option}
+                          onChange={() => handleOptionChange(question.id, option)}
+                          className="mt-1 h-4 w-4 text-brand-600"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                            Option {option}
+                          </span>
+                          <span className="block text-sm text-slate-800">{question.options[option]}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
+              <p className="text-sm text-slate-500">
+                The paper is scored automatically. Once submitted, the result appears below.
+              </p>
+              <Button
+                onClick={() => void handleSubmit()}
+                isLoading={isSubmitting}
+                leftIcon={<Send className="h-4 w-4" aria-hidden="true" />}
+              >
+                Submit exam
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+      )}
+
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Result</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Score</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">
+                  {result.score}/{result.totalQuestions}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Percentage</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">{result.percentage}%</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500">Status</p>
+                <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  Submitted
+                </p>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 };

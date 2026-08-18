@@ -39,21 +39,30 @@ export const ProtectedRoute = () => {
  * protects the data, and it returns 403 regardless of what the client renders.
  */
 export const AdminRoute = () => {
-  const { isAdmin, isInitialising } = useAuth();
+  const { isStaff, isInitialising } = useAuth();
 
   if (isInitialising) return <SessionLoading />;
 
-  return isAdmin ? <Outlet /> : <Navigate to="/dashboard" replace />;
+  return isStaff ? <Outlet /> : <Navigate to="/dashboard" replace />;
+};
+
+/** Student-only exam screen. Staff are redirected to the dashboard. */
+export const StudentRoute = () => {
+  const { user, isInitialising } = useAuth();
+
+  if (isInitialising) return <SessionLoading />;
+
+  return user?.role === 'STUDENT' ? <Outlet /> : <Navigate to="/admin" replace />;
 };
 
 /** Keeps signed-in users away from /login and /register. */
 export const PublicOnlyRoute = () => {
-  const { isAuthenticated, isAdmin, isInitialising } = useAuth();
+  const { isAuthenticated, isStaff, isInitialising } = useAuth();
 
   if (isInitialising) return <SessionLoading />;
 
   if (isAuthenticated) {
-    return <Navigate to={isAdmin ? '/admin' : '/dashboard'} replace />;
+    return <Navigate to={isStaff ? '/admin' : '/dashboard'} replace />;
   }
 
   return <Outlet />;

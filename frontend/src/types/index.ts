@@ -1,10 +1,11 @@
 /** Shared client-side types. These mirror the API contract exactly. */
 
-export type Role = 'STUDENT' | 'ADMIN';
+export type Role = 'STUDENT' | 'EXAMINER' | 'ADMIN';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH';
 export type TaskStatus = 'PENDING' | 'COMPLETED';
 export type TaskSortField = 'dueDate' | 'createdAt' | 'priority' | 'title';
 export type SortOrder = 'asc' | 'desc';
+export type QuestionOption = 'A' | 'B' | 'C' | 'D';
 
 export interface User {
   id: string;
@@ -64,6 +65,74 @@ export interface AdminDashboardData {
   statistics: AdminStatistics;
   recentTasks: Task[];
   studentProgress: StudentWithStats[];
+}
+
+export interface ExamQuestion {
+  id: string;
+  position: number;
+  questionText: string;
+  options: Record<QuestionOption, string>;
+  subject: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  explanation?: string;
+  correctOption?: QuestionOption;
+}
+
+export interface ExamAttempt {
+  id: string;
+  userId: string;
+  user?: Pick<User, 'id' | 'name' | 'email' | 'studentId' | 'role'>;
+  answers: Record<string, QuestionOption>;
+  score: number;
+  totalQuestions: number;
+  durationSeconds: number;
+  startedAt: string;
+  submittedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExamSession {
+  exam: {
+    title: string;
+    durationSeconds: number;
+    totalQuestions: number;
+  };
+  questions: ExamQuestion[];
+  latestAttempt: ExamAttempt | null;
+}
+
+export interface ExamDashboardData {
+  statistics: {
+    totalStudents: number;
+    totalExaminers: number;
+    totalQuestions: number;
+    totalAttempts: number;
+    averageScore: number;
+  };
+  questions: ExamQuestion[];
+  attempts: ExamAttempt[];
+}
+
+export interface ExamQuestionPayload {
+  questionText: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption: QuestionOption;
+  explanation?: string;
+  subject: string;
+  position: number;
+  isActive?: boolean;
+}
+
+export interface SubmitExamPayload {
+  startedAt?: string;
+  elapsedSeconds?: number;
+  answers: Record<string, QuestionOption>;
 }
 
 /** Query parameters accepted by the task list endpoints. */

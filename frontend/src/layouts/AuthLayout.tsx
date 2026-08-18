@@ -1,46 +1,41 @@
 import { Outlet } from 'react-router-dom';
-import { BookOpenCheck, CalendarClock, ShieldCheck } from 'lucide-react';
+import { BookOpenCheck, Clock3, ShieldCheck } from 'lucide-react';
 
 const HIGHLIGHTS = [
   {
     icon: BookOpenCheck,
-    title: 'All your assignments in one place',
-    description: 'Track coursework by subject, priority and deadline.',
+    title: '10 MCQ questions',
+    description: 'A short paper that is easy to run in class or in a lab demo.',
   },
   {
-    icon: CalendarClock,
-    title: 'Never miss a deadline',
-    description: 'Overdue work is flagged automatically as soon as a due date passes.',
+    icon: Clock3,
+    title: 'Timed attempt',
+    description: 'The countdown keeps the exam moving and gives the timer a visible role.',
   },
   {
     icon: ShieldCheck,
-    title: 'Private by default',
-    description: 'Every account only ever sees its own tasks - enforced on the server.',
+    title: 'Role-based access',
+    description: 'Students take the exam, while staff manage the question bank and results.',
   },
 ];
 
-/**
- * Split layout for login/register: a marketing panel on large screens, and
- * just the form on small ones.
- */
 export const AuthLayout = () => (
   <div className="flex min-h-screen bg-slate-50">
-    {/* Context panel - hidden on small screens where the form matters most. */}
     <aside className="hidden w-1/2 flex-col justify-between bg-slate-900 p-12 lg:flex">
       <div className="flex items-center gap-2.5">
         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
           <BookOpenCheck className="h-5 w-5" aria-hidden="true" />
         </span>
-        <span className="text-base font-semibold text-white">Student Task Manager</span>
+        <span className="text-base font-semibold text-white">Exam System (MCQ)</span>
       </div>
 
       <div className="max-w-md">
         <h2 className="text-3xl font-semibold leading-tight tracking-tight text-white">
-          Stay on top of every assignment.
+          A simple online exam flow.
         </h2>
         <p className="mt-3 text-slate-400">
-          A single place for students to manage coursework, and for faculty to assign and follow
-          class progress.
+          Students log in, answer the paper, and see their score right away. Staff keep the
+          question bank tidy from the same app.
         </p>
 
         <ul className="mt-10 space-y-6">
@@ -58,9 +53,7 @@ export const AuthLayout = () => (
         </ul>
       </div>
 
-      <p className="text-xs text-slate-500">
-        React · Vite · Tailwind CSS · Express · Prisma · SQLite
-      </p>
+      <p className="text-xs text-slate-500">React · Vite · Tailwind CSS · Express · Prisma · SQLite</p>
     </aside>
 
     <div className="flex w-full items-center justify-center px-4 py-12 lg:w-1/2">

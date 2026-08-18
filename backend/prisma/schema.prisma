@@ -21,7 +21,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// An application user. `role` is either "STUDENT" or "ADMIN".
+/// An application user. `role` is either "STUDENT", "EXAMINER" or "ADMIN".
 model User {
   id           String   @id @default(cuid())
   name         String
@@ -32,7 +32,7 @@ model User {
   email        String   @unique
   /// bcrypt hash - a plaintext password is never persisted.
   passwordHash String
-  /// "STUDENT" | "ADMIN"
+  /// "STUDENT" | "EXAMINER" | "ADMIN"
   role         String   @default("STUDENT")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -41,6 +41,7 @@ model User {
   tasks        Task[]   @relation("TaskOwner")
   /// Tasks this user authored (a student's own tasks, or admin-assigned ones).
   createdTasks Task[]   @relation("TaskCreator")
+  examAttempts ExamAttempt[]
 
   @@index([email])
   @@index([studentId])
@@ -77,4 +78,45 @@ model Task {
   @@index([createdBy])
   @@index([studentId, status])
   @@map("tasks")
+}
+
+/// MCQ question bank for the exam system.
+model ExamQuestion {
+  id            String   @id @default(cuid())
+  position      Int      @unique
+  questionText  String
+  optionA       String
+  optionB       String
+  optionC       String
+  optionD       String
+  correctOption String
+  explanation   String   @default("")
+  subject       String   @default("General")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([subject])
+  @@map("exam_questions")
+}
+
+/// Stores one submitted exam attempt from a student.
+model ExamAttempt {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answersJson     String
+  score           Int
+  totalQuestions  Int
+  durationSeconds Int
+  startedAt       DateTime
+  submittedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId])
+  @@index([userId])
+  @@index([submittedAt])
+  @@map("exam_attempts")
 }

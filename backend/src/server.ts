@@ -20,7 +20,7 @@ const start = async (): Promise<void> => {
 
   const server = app.listen(env.PORT, () => {
     console.log('');
-    console.log('  Student Task Manager API');
+    console.log('  Exam System (MCQ) API');
     console.log(`  Environment : ${env.NODE_ENV}`);
     console.log(`  Listening   : http://localhost:${env.PORT}`);
     console.log(`  Health      : http://localhost:${env.PORT}/api/health`);

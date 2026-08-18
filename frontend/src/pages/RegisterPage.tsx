@@ -95,9 +95,9 @@ export const RegisterPage = () => {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Create your account</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Create your student account</h1>
         <p className="mt-1.5 text-sm text-slate-500">
-          Register as a student to start tracking your assignments.
+          Register as a student to take the exam and see your result after submission.
         </p>
       </div>
 

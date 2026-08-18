@@ -1,17 +1,6 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import {
-  CheckSquare,
-  ClipboardList,
-  FilePlus2,
-  LayoutDashboard,
-  ListTodo,
-  LogOut,
-  Menu,
-  User,
-  Users,
-  X,
-} from 'lucide-react';
+import { CheckSquare, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
@@ -21,26 +10,15 @@ interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  /** `end` prevents "/admin" staying active on "/admin/students". */
   end?: boolean;
 }
 
-const STUDENT_NAV: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/tasks', label: 'Tasks', icon: ListTodo },
-  { to: '/completed', label: 'Completed', icon: CheckSquare },
-  { to: '/profile', label: 'Profile', icon: User },
-];
+const STUDENT_NAV: NavItem[] = [{ to: '/dashboard', label: 'Exam', icon: CheckSquare }];
 
-const ADMIN_NAV: NavItem[] = [
+const STAFF_NAV: NavItem[] = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/students', label: 'Students', icon: Users },
-  { to: '/admin/tasks', label: 'All Tasks', icon: ClipboardList },
-  { to: '/admin/tasks/create', label: 'Create Assignment', icon: FilePlus2 },
-  { to: '/profile', label: 'Profile', icon: User },
 ];
 
-/** `Aarav Sharma` -> `AS` */
 const initials = (name: string): string =>
   name
     .split(' ')
@@ -49,14 +27,13 @@ const initials = (name: string): string =>
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
 
-/** Top navigation. Collapses into a disclosure menu below the `md` breakpoint. */
 export const Navbar = () => {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isStaff, logout } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const navItems = isAdmin ? ADMIN_NAV : STUDENT_NAV;
+  const navItems = isStaff ? STAFF_NAV : STUDENT_NAV;
 
   const handleLogout = async () => {
     await logout();
@@ -74,20 +51,15 @@ export const Navbar = () => {
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
-          {/* Brand */}
-          <Link
-            to={isAdmin ? '/admin' : '/dashboard'}
-            className="flex shrink-0 items-center gap-2.5"
-          >
+          <Link to={isStaff ? '/admin' : '/dashboard'} className="flex shrink-0 items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white">
               <CheckSquare className="h-5 w-5" aria-hidden="true" />
             </span>
             <span className="hidden text-base font-semibold tracking-tight text-slate-900 sm:block">
-              Student Task Manager
+              Exam System (MCQ)
             </span>
           </Link>
 
-          {/* Desktop navigation */}
           <nav className="hidden items-center gap-1 md:flex" aria-label="Main navigation">
             {navItems.map((item) => (
               <NavLink key={item.to} to={item.to} end={item.end} className={linkClasses}>
@@ -97,7 +69,6 @@ export const Navbar = () => {
             ))}
           </nav>
 
-          {/* User identity + logout */}
           <div className="flex items-center gap-3">
             <div className="hidden items-center gap-2.5 border-l border-slate-200 pl-3 md:flex">
               <span
@@ -111,7 +82,7 @@ export const Navbar = () => {
                   {user?.name}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {isAdmin ? 'Administrator' : `Student${user?.studentId ? ` · ${user.studentId}` : ''}`}
+                  {isStaff ? 'Staff' : `Student${user?.studentId ? ` · ${user.studentId}` : ''}`}
                 </p>
               </div>
             </div>
@@ -133,17 +104,12 @@ export const Navbar = () => {
               aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
               className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden"
             >
-              {isMenuOpen ? (
-                <X className="h-5 w-5" aria-hidden="true" />
-              ) : (
-                <Menu className="h-5 w-5" aria-hidden="true" />
-              )}
+              {isMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile navigation */}
       {isMenuOpen && (
         <nav
           id="mobile-menu"
@@ -160,7 +126,7 @@ export const Navbar = () => {
             <div className="min-w-0 leading-tight">
               <p className="truncate text-sm font-medium text-slate-900">{user?.name}</p>
               <p className="text-xs text-slate-500">
-                {isAdmin ? 'Administrator' : `Student${user?.studentId ? ` · ${user.studentId}` : ''}`}
+                {isStaff ? 'Staff' : `Student${user?.studentId ? ` · ${user.studentId}` : ''}`}
               </p>
             </div>
           </div>

@@ -50,3 +50,6 @@ export const findStudentsByIds = (ids: string[]): Promise<User[]> =>
   prisma.user.findMany({ where: { id: { in: ids }, role: 'STUDENT' } });
 
 export const countStudents = (): Promise<number> => prisma.user.count({ where: { role: 'STUDENT' } });
+
+export const countExaminers = (): Promise<number> =>
+  prisma.user.count({ where: { role: 'EXAMINER' } });

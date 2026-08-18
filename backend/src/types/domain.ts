@@ -6,7 +6,7 @@
  * boundary and the DB columns carry matching defaults.
  */
 
-export const ROLES = ['STUDENT', 'ADMIN'] as const;
+export const ROLES = ['STUDENT', 'EXAMINER', 'ADMIN'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH'] as const;
@@ -47,3 +47,6 @@ export interface AuthenticatedUser {
   role: Role;
   studentId: string | null;
 }
+
+export const QUESTION_OPTIONS = ['A', 'B', 'C', 'D'] as const;
+export type QuestionOption = (typeof QUESTION_OPTIONS)[number];

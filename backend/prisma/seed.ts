@@ -15,6 +15,7 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 const ADMIN_PASSWORD = 'Admin@123';
+const EXAMINER_PASSWORD = 'Examiner@123';
 const STUDENT_PASSWORD = 'Student@123';
 const SALT_ROUNDS = 10;
 
@@ -192,15 +193,121 @@ const STUDENTS = [
   { name: 'Sneha Iyer', email: 'student4@college.local', studentId: 'CS21B004' },
 ];
 
+const EXAM_QUESTIONS = [
+  {
+    position: 1,
+    questionText: 'What does MCQ stand for?',
+    optionA: 'Multiple Choice Question',
+    optionB: 'Main Course Quiz',
+    optionC: 'Manual Choice Query',
+    optionD: 'Marked Class Questionnaire',
+    correctOption: 'A',
+    subject: 'General',
+  },
+  {
+    position: 2,
+    questionText: 'Which HTML tag is used to create a line break?',
+    optionA: '<hr>',
+    optionB: '<br>',
+    optionC: '<break>',
+    optionD: '<lb>',
+    correctOption: 'B',
+    subject: 'Web Basics',
+  },
+  {
+    position: 3,
+    questionText: 'Which one is a JavaScript framework?',
+    optionA: 'Laravel',
+    optionB: 'Django',
+    optionC: 'React',
+    optionD: 'Flask',
+    correctOption: 'C',
+    subject: 'Web Basics',
+  },
+  {
+    position: 4,
+    questionText: 'What is the binary representation of decimal 5?',
+    optionA: '101',
+    optionB: '110',
+    optionC: '100',
+    optionD: '111',
+    correctOption: 'A',
+    subject: 'Computer Basics',
+  },
+  {
+    position: 5,
+    questionText: 'Which SQL keyword is used to fetch data from a table?',
+    optionA: 'GET',
+    optionB: 'SELECT',
+    optionC: 'PICK',
+    optionD: 'READ',
+    correctOption: 'B',
+    subject: 'DBMS',
+  },
+  {
+    position: 6,
+    questionText: 'What does CPU stand for?',
+    optionA: 'Central Processing Unit',
+    optionB: 'Computer Personal Unit',
+    optionC: 'Control Program Utility',
+    optionD: 'Central Program Upload',
+    correctOption: 'A',
+    subject: 'Computer Basics',
+  },
+  {
+    position: 7,
+    questionText: 'Which symbol is used for comments in JavaScript?',
+    optionA: '//',
+    optionB: '/* */ only',
+    optionC: '#',
+    optionD: '<!-- -->',
+    correctOption: 'A',
+    subject: 'Web Basics',
+  },
+  {
+    position: 8,
+    questionText: 'What is the output of 2 + 2 * 2?',
+    optionA: '8',
+    optionB: '6',
+    optionC: '4',
+    optionD: '2',
+    correctOption: 'B',
+    subject: 'Aptitude',
+  },
+  {
+    position: 9,
+    questionText: 'Which database is used in this project setup?',
+    optionA: 'MongoDB',
+    optionB: 'PostgreSQL',
+    optionC: 'SQLite',
+    optionD: 'MySQL',
+    correctOption: 'C',
+    subject: 'Project',
+  },
+  {
+    position: 10,
+    questionText: 'What does HTTP stand for?',
+    optionA: 'HyperText Transfer Protocol',
+    optionB: 'High Text Transmission Program',
+    optionC: 'Hyper Transfer Task Process',
+    optionD: 'Host Tool Transfer Protocol',
+    correctOption: 'A',
+    subject: 'Web Basics',
+  },
+];
+
 async function main(): Promise<void> {
   console.log('Seeding database...\n');
 
   // Wipe existing rows so the seed is idempotent and repeatable.
+  await prisma.examAttempt.deleteMany();
+  await prisma.examQuestion.deleteMany();
   await prisma.task.deleteMany();
   await prisma.user.deleteMany();
 
-  const [adminHash, studentHash] = await Promise.all([
+  const [adminHash, examinerHash, studentHash] = await Promise.all([
     bcrypt.hash(ADMIN_PASSWORD, SALT_ROUNDS),
+    bcrypt.hash(EXAMINER_PASSWORD, SALT_ROUNDS),
     bcrypt.hash(STUDENT_PASSWORD, SALT_ROUNDS),
   ]);
 
@@ -214,6 +321,17 @@ async function main(): Promise<void> {
     },
   });
   console.log(`  Admin created    : ${admin.email}`);
+
+  const examiner = await prisma.user.create({
+    data: {
+      name: 'Ms. Ananya Rao',
+      email: 'examiner@college.local',
+      studentId: null,
+      passwordHash: examinerHash,
+      role: 'EXAMINER',
+    },
+  });
+  console.log(`  Examiner created : ${examiner.email}`);
 
   let taskCount = 0;
 
@@ -248,11 +366,21 @@ async function main(): Promise<void> {
     console.log(`  Student created  : ${created.email.padEnd(24)} (${tasks.length} tasks)`);
   }
 
+  await prisma.examQuestion.createMany({
+    data: EXAM_QUESTIONS.map((question) => ({
+      ...question,
+      explanation: '',
+      isActive: true,
+    })),
+  });
+
   console.log(`\n  ${STUDENTS.length} students and ${taskCount} tasks seeded.`);
+  console.log(`  ${EXAM_QUESTIONS.length} exam questions seeded.`);
   console.log('\n  ---------------------------------------------------------');
   console.log('   DEMO CREDENTIALS  (development only - do not use in prod)');
   console.log('  ---------------------------------------------------------');
   console.log(`   Admin    : admin@college.local     / ${ADMIN_PASSWORD}`);
+  console.log(`   Examiner : examiner@college.local  / ${EXAMINER_PASSWORD}`);
   console.log(`   Student  : student1@college.local  / ${STUDENT_PASSWORD}`);
   console.log(`   Student  : student2@college.local  / ${STUDENT_PASSWORD}`);
   console.log(`   Student  : student3@college.local  / ${STUDENT_PASSWORD}`);

@@ -1,42 +1,32 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
-import { AdminRoute, ProtectedRoute, PublicOnlyRoute } from '@/components/routing/RouteGuards';
+import { AdminRoute, ProtectedRoute, PublicOnlyRoute, StudentRoute } from '@/components/routing/RouteGuards';
 import { AppLayout } from '@/layouts/AppLayout';
 import { AuthLayout } from '@/layouts/AuthLayout';
+import { useAuth } from '@/hooks/useAuth';
 
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { DashboardPage } from '@/pages/DashboardPage';
-import { CompletedTasksPage, TasksPage } from '@/pages/TasksPage';
-import { TaskDetailPage } from '@/pages/TaskDetailPage';
-import { ProfilePage } from '@/pages/ProfilePage';
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
-import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
-import { AdminStudentsPage } from '@/pages/admin/AdminStudentsPage';
-import { AdminStudentDetailPage } from '@/pages/admin/AdminStudentDetailPage';
-import { AdminTasksPage } from '@/pages/admin/AdminTasksPage';
-import { AdminCreateTaskPage } from '@/pages/admin/AdminCreateTaskPage';
+const HomeRedirect = () => {
+  const { isAuthenticated, isStaff, isInitialising } = useAuth();
 
-/**
- * Route table.
- *
- * Three tiers of access:
- *   PublicOnlyRoute - login/register, redirects away if already signed in
- *   ProtectedRoute  - requires a valid session
- *   AdminRoute      - additionally requires the ADMIN role
- *
- * These guards shape navigation only. Every one of them has a matching
- * server-side check (`authenticate` / `requireAdmin`), which is what actually
- * protects the data.
- */
+  if (isInitialising) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Navigate to={isStaff ? '/admin' : '/dashboard'} replace />;
+};
+
 const App = () => (
   <BrowserRouter>
     <ToastProvider>
       <AuthProvider>
         <Routes>
-          {/* Public */}
+          <Route path="/" element={<HomeRedirect />} />
+
           <Route element={<PublicOnlyRoute />}>
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<LoginPage />} />
@@ -44,29 +34,19 @@ const App = () => (
             </Route>
           </Route>
 
-          {/* Authenticated */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/tasks" element={<TasksPage />} />
-              <Route path="/tasks/:id" element={<TaskDetailPage />} />
-              <Route path="/completed" element={<CompletedTasksPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+              <Route element={<StudentRoute />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+              </Route>
 
-              {/* Admin only */}
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminDashboardPage />} />
-                <Route path="/admin/students" element={<AdminStudentsPage />} />
-                <Route path="/admin/students/:id" element={<AdminStudentDetailPage />} />
-                <Route path="/admin/tasks" element={<AdminTasksPage />} />
-                <Route path="/admin/tasks/create" element={<AdminCreateTaskPage />} />
               </Route>
 
               <Route path="*" element={<NotFoundPage />} />
             </Route>
           </Route>
-
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </AuthProvider>
     </ToastProvider>

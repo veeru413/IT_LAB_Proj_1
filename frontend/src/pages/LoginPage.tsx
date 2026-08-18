@@ -20,7 +20,8 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 /** Demo accounts, surfaced so the app can be tried immediately. */
 const DEMO_ACCOUNTS = [
-  { label: 'Admin (professor)', email: 'admin@college.local', password: 'Admin@123' },
+  { label: 'Admin', email: 'admin@college.local', password: 'Admin@123' },
+  { label: 'Examiner', email: 'examiner@college.local', password: 'Examiner@123' },
   { label: 'Student', email: 'student1@college.local', password: 'Student@123' },
 ];
 
@@ -50,7 +51,7 @@ export const LoginPage = () => {
 
       // Return the user where they were heading, or to their home dashboard.
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from ?? (user.role === 'ADMIN' ? '/admin' : '/dashboard'), { replace: true });
+      navigate(from ?? (user.role === 'STUDENT' ? '/dashboard' : '/admin'), { replace: true });
     } catch (error) {
       setFormError(
         error instanceof ApiRequestError ? error.message : 'Login failed. Please try again.',
@@ -70,7 +71,7 @@ export const LoginPage = () => {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Welcome back</h1>
         <p className="mt-1.5 text-sm text-slate-500">
-          Sign in to manage your assignments and deadlines.
+          Sign in to take the exam or manage the question bank.
         </p>
       </div>
 
